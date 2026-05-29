@@ -1,0 +1,1 @@
+- [SchulSaniApp architecture](schulsaniapp-arch.md) — Expo+Express+Postgres school paramedic app; key routing, env, and codegen quirks

@@ -1,0 +1,330 @@
+Before you write a single line of code, fetch and thoroughly read the existing repository at https://github.com/Viktor230623-M/SchulSaniApp or use the zip file which I have uploaded. Study every screen, every component, the navigation structure, the color scheme, the card layouts, the bottom tabs, the mission flow, the duty roster, the LOA flow, and the news feed. The goal is NOT to copy the code — the goal is to understand the design language and UX so closely that the rebuild feels like a polished, professional version of the same app. Users who know the old app should immediately feel at home.
+
+
+The existing codebase has specific problems to avoid:
+
+	•	Real student names hardcoded in source files — never do this
+	•	In-memory storage that resets on server restart — everything in the database
+	•	Dead code and unused arrays — clean slate only
+	•	ngrok-skip-browser-warning header in API client — never in production
+	•	No consistent design system — random inline styles everywhere
+	•	Roles hardcoded per username — roles are managed in the database
+
+Project
+
+SchulSaniApp — a self-hosted mobile app for school paramedic teams (Schulsanitätsdienst) in Germany. Each school runs their own instance on their own server. The app handles missions, duty rosters, absence requests, and news.
+
+Tech Stack
+
+Monorepo: pnpm workspaces
+
+Mobile: Expo (React Native), TypeScript, Zustand, Expo Router
+
+Backend: Hono, TypeScript, Zod
+
+Database: Drizzle ORM + PostgreSQL (self-hosted, one instance per deployment)
+
+Auth: Direct IServ credential POST — credentials go from the school’s server to the school’s own IServ instance, never leaving the school’s infrastructure
+
+Push Notifications: Expo Notifications + EAS
+
+Folder Structure
+
+/
+├── apps/
+│   ├── mobile/
+│   └── api/
+├── packages/
+│   ├── db/        # Drizzle schema + migrations
+│   └── shared/    # Shared types + Zod schemas
+├── docker-compose.yml
+├── pnpm-workspace.yaml
+└── package.json
+
+
+Database Schema
+
+Since each deployment serves exactly one school, there is no school_id. Each instance is one school.
+
+users:
+  id (uuid, pk)
+  iserv_username (text, unique)
+  display_name (text)
+  email (text)
+  role (enum: admin | wachleiter | sanitaeter)
+  is_active (boolean, default false)
+  created_at
+
+sessions:
+  id (uuid, pk)
+  user_id (uuid, fk users)
+  token (text, unique)
+  expires_at
+  created_at
+
+missions:
+  id (uuid, pk)
+  created_by (uuid, fk users)
+  title (text)
+  location (text)
+  patient_initials (text)
+  treatment_notes (text)
+  status (enum: active | closed)
+  created_at
+  closed_at (nullable)
+
+mission_responders:
+  id (uuid, pk)
+  mission_id (uuid, fk missions)
+  user_id (uuid, fk users)
+  responded_at
+
+duty_slots:
+  id (uuid, pk)
+  user_id (uuid, fk users)
+  date (date)
+  start_time (text)
+  end_time (text)
+  notes (text, nullable)
+  created_at
+
+loa_requests:
+  id (uuid, pk)
+  user_id (uuid, fk users)
+  reason (text)
+  from_date (date)
+  to_date (date)
+  status (enum: pending | approved | rejected)
+  reviewed_by (uuid, fk users, nullable)
+  reviewed_at (nullable)
+  created_at
+
+news:
+  id (uuid, pk)
+  author_id (uuid, fk users)
+  title (text)
+  content (text)
+  is_pinned (boolean, default false)
+  created_at
+
+push_tokens:
+  id (uuid, pk)
+  user_id (uuid, fk users)
+  token (text)
+  platform (enum: ios | android)
+  created_at
+
+activity_log:
+  id (uuid, pk)
+  user_id (uuid, fk users)
+  action (text)
+  metadata (jsonb)
+  created_at
+
+
+IServ Authentication Flow
+
+Each school self-hosts their own instance. The backend POSTs credentials directly to the school’s own IServ — credentials never leave the school’s infrastructure.
+
+Login flow:
+
+	1.	User enters IServ username and password in the app
+	2.	App sends to POST /auth/login
+	3.	Backend POSTs to {ISERV_URL}/iserv/app/login with credentials
+	4.	On success IServ returns a session cookie
+	5.	Backend fetches user info (display name, email) from IServ using the session
+	6.	Backend upserts user in DB and returns a signed JWT
+	7.	App stores JWT in expo-secure-store
+
+First admin bootstrap:
+The .env contains FIRST_ADMIN_USERNAME. The first time a user with that IServ username logs in, they are automatically assigned role: admin and is_active: true. All other first-time users get role: sanitaeter and is_active: false — they must be activated by an admin in the admin panel.
+
+Rate limiting: Max 10 login attempts per IP per minute. Never log the request body of POST /auth/login.
+
+Environment config:
+
+DATABASE_URL=
+JWT_SECRET=
+ISERV_URL=https://gymbla.de
+FIRST_ADMIN_USERNAME=
+PORT=3000
+
+
+Role Management
+
+Roles are stored in the database and managed entirely through the admin panel. No roles are ever hardcoded in source files.
+
+|Role      |Permissions                                                         |
+|----------|--------------------------------------------------------------------|
+|sanitaeter|View and create missions, view duty, submit LOA, view news          |
+|wachleiter|All above + close missions, edit duty, approve/reject LOA, post news|
+|admin     |All above + manage users (activate, deactivate, change role)        |
+
+When a new user logs in for the first time:
+
+	•	Account created with is_active: false, role: sanitaeter
+	•	User sees a “Dein Account wartet auf Freischaltung” screen
+	•	Admin sees pending accounts in the admin panel and can activate them and assign a role
+
+API Routes (Hono)
+
+POST   /auth/login
+POST   /auth/logout
+GET    /auth/me
+
+GET    /missions
+POST   /missions
+PATCH  /missions/:id
+POST   /missions/:id/close        (wachleiter+)
+POST   /missions/:id/respond
+
+GET    /duty
+POST   /duty                      (wachleiter+)
+DELETE /duty/:id                  (wachleiter+)
+
+GET    /loa
+POST   /loa
+PATCH  /loa/:id                   (wachleiter+)
+
+GET    /news
+POST   /news                      (wachleiter+)
+PATCH  /news/:id                  (wachleiter+)
+DELETE /news/:id                  (wachleiter+)
+
+GET    /users                     (wachleiter+)
+PATCH  /users/:id                 (admin only)
+
+POST   /push-tokens
+
+
+Mobile App Structure (Expo Router)
+
+app/
+  _layout.tsx
+  index.tsx              → redirect to /login or /(tabs)/missions
+  login.tsx
+  pending.tsx            → "Account wartet auf Freischaltung"
+  (tabs)/
+    _layout.tsx
+    missions.tsx
+    duty.tsx
+    loa.tsx
+    news.tsx
+    profile.tsx
+  mission/
+    new.tsx
+    [id].tsx
+  admin/
+    users.tsx
+
+
+Design
+
+This is the most important section. Read it carefully.
+
+Study the existing app on GitHub thoroughly before designing anything. The rebuild must feel like the same app — same screens, same navigation flow, same general structure — but professionally executed. Not a different app. A cleaned-up version of the same app.
+
+The existing app already has a dark theme and a color palette that works. Keep the same general aesthetic — dark backgrounds, colored status indicators, card-based layouts, bottom tab navigation. The goal is to clean it up, make it consistent, and remove the random inline styling — not to redesign it from scratch.
+
+Define a theme.ts with all design tokens. Use it everywhere. No hardcoded colors, sizes, or spacing anywhere in component files.
+
+export const colors = {
+  background: '#0A0F1E',
+  surface: '#111827',
+  surfaceElevated: '#1F2937',
+  border: '#374151',
+  primary: '#3B82F6',
+  primaryDark: '#1D4ED8',
+  danger: '#EF4444',
+  warning: '#F59E0B',
+  success: '#10B981',
+  textPrimary: '#F9FAFB',
+  textSecondary: '#9CA3AF',
+  textMuted: '#6B7280',
+}
+
+export const spacing = {
+  xs: 4, sm: 8, md: 16, lg: 24, xl: 32, xxl: 48
+}
+
+export const radius = {
+  sm: 6, md: 12, lg: 16, full: 9999
+}
+
+
+UI rules:
+
+	•	Dark theme, white theme, and colored themes, add 3 own designs, so we have Dark, white, and 3 of your own 
+	•	Consistent header on every screen: title left, optional action button right
+	•	Cards: surface background, border border, radius.md corners, spacing.md padding
+	•	Status badges as colored pills — never plain text
+	•	Bottom tabs: icon + label, active in primary, inactive in textMuted
+	•	Skeleton loaders for loading states — no centered spinners
+	•	Empty states: icon + heading + subtext — no blank screens
+	•	Active missions: red banner pinned to top of missions tab, clearly visible
+	•	Full-width primary button at bottom of all forms
+	•	Safe area insets everywhere via react-native-safe-area-context
+	•	All styles via StyleSheet.create using theme tokens — zero inline styles
+
+Docker Deployment
+
+Provide a docker-compose.yml with three services:
+
+	•	db: PostgreSQL 16
+	•	api: the Hono backend
+	•	app: not needed (Expo builds separately via EAS)
+
+Schools set up the backend by running:
+
+cp .env.example .env
+# fill in .env
+docker compose up -d
+
+
+Security
+
+.gitignore must include:
+
+.env
+.env.local
+.env.production
+node_modules/
+.expo/
+dist/
+build/
+*.log
+.DS_Store
+
+
+	•	JWT secret minimum 32 characters, randomly generated
+	•	JWT expires after 7 days
+	•	Rate limit /auth/login — max 10 requests per IP per minute
+	•	Security headers on every response
+	•	Never return tokens or credentials in API responses
+	•	Never log /auth/login request body
+	•	JWT stored in expo-secure-store on mobile — never AsyncStorage
+
+Translations
+
+Two hardcoded files: apps/mobile/i18n/de.ts (default) and apps/mobile/i18n/en.ts. A useTranslation() hook reads the current language from Zustand (persisted in SecureStore). Language toggle in the profile tab. Never use raw strings in JSX.
+
+export const de = {
+  login: { title: 'Anmelden', username: 'Benutzername', password: 'Passwort', submit: 'Anmelden', error: 'Anmeldung fehlgeschlagen.' },
+  nav: { missions: 'Einsätze', duty: 'Dienst', loa: 'Abwesenheit', news: 'Aktuelles', profile: 'Profil' },
+  missions: { title: 'Einsätze', active: 'Aktiver Einsatz', new: 'Neuer Einsatz', location: 'Ort', patientInitials: 'Patientenkürzel', treatmentNotes: 'Behandlungsnotizen', close: 'Abschließen', respond: 'Reagieren', status: { active: 'Aktiv', closed: 'Abgeschlossen' }, empty: 'Keine Einsätze' },
+  duty: { title: 'Dienstplan', add: 'Dienst eintragen', empty: 'Kein Dienst eingetragen' },
+  loa: { title: 'Abwesenheit', new: 'Abwesenheit melden', reason: 'Grund', from: 'Von', to: 'Bis', status: { pending: 'Ausstehend', approved: 'Genehmigt', rejected: 'Abgelehnt' }, empty: 'Keine Abwesenheiten' },
+  news: { title: 'Aktuelles', new: 'Beitrag erstellen', pinned: 'Angepinnt', empty: 'Keine Beiträge' },
+  profile: { title: 'Profil', role: 'Rolle', language: 'Sprache', logout: 'Abmelden', roles: { admin: 'Administrator', wachleiter: 'Wachleiter', sanitaeter: 'Sanitäter' } },
+  general: { save: 'Speichern', cancel: 'Abbrechen', delete: 'Löschen', loading: 'Lädt...', error: 'Fehler aufgetreten', success: 'Erfolgreich', pending: 'Dein Account wartet auf Freischaltung durch einen Administrator.' },
+}
+
+
+General Rules
+
+	•	TypeScript strict mode, no any
+	•	.env.example with all keys, no real values committed
+	•	Zod validation on every API input
+	•	All API responses fully typed end-to-end
+	•	Error boundaries on all tab screens
+	•	All UI text through the translation system
