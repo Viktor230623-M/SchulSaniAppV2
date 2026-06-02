@@ -44,6 +44,11 @@ Thumbs.db
 .cursor/rules/nx-rules.mdc
 .github/instructions/nx.instructions.md
 
+# Environment files — never commit these
+.env
+.env.local
+.env.*.local
+
 # Replit
 .cache/
 .replit
@@ -59,3 +64,23 @@ artifacts/schulsaniapp/.expo/types/
 
 # Replit artifact config
 **/.replit-artifact/CLAUDE.md
+
+## Git Commit Convention
+Always use Conventional Commits format:
+- `feat:` — new feature
+- `fix:` — bug fix
+- `chore:` — maintenance, config, deps
+- `refactor:` — code change that's not a fix or feature
+- `style:` — formatting, missing semicolons, etc
+- `test:` — adding or fixing tests
+- `docs:` — documentation changes
+- `perf:` — performance improvements
+- `ci:` — CI/CD changes
+
+Examples:
+- `feat: add mission responder flow`
+- `fix: JWT not refreshing on expiry`
+- `chore: update pnpm lockfile`
+
+Never use vague messages like "fix bug" or "update code".
+

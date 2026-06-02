@@ -31,7 +31,7 @@ export const LoginResponse = zod.object({
   "iservUsername": zod.string(),
   "displayName": zod.string(),
   "email": zod.string(),
-  "role": zod.enum(['owner', 'admin', 'wachleiter', 'sanitaeter']),
+  "role": zod.enum(['owner', 'admin', 'sanitaeter_leitung_admin', 'sanitaeter_leitung', 'teacher', 'sanitaeter']),
   "customRoleId": zod.string().nullish(),
   "customRole": zod.object({
   "id": zod.string(),
@@ -63,7 +63,7 @@ export const GetMeResponse = zod.object({
   "iservUsername": zod.string(),
   "displayName": zod.string(),
   "email": zod.string(),
-  "role": zod.enum(['owner', 'admin', 'wachleiter', 'sanitaeter']),
+  "role": zod.enum(['owner', 'admin', 'sanitaeter_leitung_admin', 'sanitaeter_leitung', 'teacher', 'sanitaeter']),
   "customRoleId": zod.string().nullish(),
   "customRole": zod.object({
   "id": zod.string(),
@@ -269,78 +269,6 @@ export const DeleteDutySlotResponse = zod.object({
 
 
 /**
- * @summary Get current user's duty slot and entry for today
- */
-export const GetDutyTodayResponse = zod.object({
-  "slot": zod.object({
-  "id": zod.string(),
-  "userId": zod.string(),
-  "displayName": zod.string(),
-  "date": zod.string(),
-  "startTime": zod.string(),
-  "endTime": zod.string(),
-  "notes": zod.string().nullish(),
-  "createdAt": zod.string()
-}).nullable(),
-  "entry": zod.object({
-  "id": zod.string(),
-  "userId": zod.string(),
-  "dutySlotId": zod.string(),
-  "date": zod.string(),
-  "enteredAt": zod.string(),
-  "confirmedAt": zod.string().nullish()
-}).nullable()
-})
-
-
-/**
- * @summary Confirm daily attendance
- */
-export const ConfirmDutyResponse = zod.object({
-  "id": zod.string(),
-  "userId": zod.string(),
-  "dutySlotId": zod.string(),
-  "date": zod.string(),
-  "enteredAt": zod.string(),
-  "confirmedAt": zod.string().nullish()
-})
-
-
-/**
- * @summary List all duty entries (managers only)
- */
-export const GetDutyEntriesResponseItem = zod.object({
-  "id": zod.string(),
-  "userId": zod.string(),
-  "displayName": zod.string().nullish(),
-  "dutySlotId": zod.string(),
-  "date": zod.string(),
-  "enteredAt": zod.string(),
-  "confirmedAt": zod.string().nullish()
-})
-export const GetDutyEntriesResponse = zod.array(GetDutyEntriesResponseItem)
-
-
-/**
- * @summary Get activity log
- */
-export const GetActivityQueryParams = zod.object({
-  "userId": zod.coerce.string().optional(),
-  "action": zod.coerce.string().optional()
-})
-
-export const GetActivityResponseItem = zod.object({
-  "id": zod.string(),
-  "userId": zod.string().nullish(),
-  "displayName": zod.string().nullish(),
-  "action": zod.string(),
-  "metadata": zod.record(zod.string(), zod.unknown()).nullish(),
-  "createdAt": zod.string()
-})
-export const GetActivityResponse = zod.array(GetActivityResponseItem)
-
-
-/**
  * @summary List LOA requests
  */
 export const GetLoaRequestsResponseItem = zod.object({
@@ -464,7 +392,7 @@ export const GetUsersResponseItem = zod.object({
   "iservUsername": zod.string(),
   "displayName": zod.string(),
   "email": zod.string(),
-  "role": zod.enum(['owner', 'admin', 'wachleiter', 'sanitaeter']),
+  "role": zod.enum(['owner', 'admin', 'sanitaeter_leitung_admin', 'sanitaeter_leitung', 'teacher', 'sanitaeter']),
   "customRoleId": zod.string().nullish(),
   "customRole": zod.object({
   "id": zod.string(),
@@ -488,7 +416,7 @@ export const UpdateUserParams = zod.object({
 })
 
 export const UpdateUserBody = zod.object({
-  "role": zod.enum(['admin', 'wachleiter', 'sanitaeter']).optional(),
+  "role": zod.enum(['admin', 'sanitaeter_leitung_admin', 'sanitaeter_leitung', 'teacher', 'sanitaeter']).optional(),
   "isActive": zod.boolean().optional(),
   "customRoleId": zod.string().nullish()
 })
@@ -498,7 +426,7 @@ export const UpdateUserResponse = zod.object({
   "iservUsername": zod.string(),
   "displayName": zod.string(),
   "email": zod.string(),
-  "role": zod.enum(['owner', 'admin', 'wachleiter', 'sanitaeter']),
+  "role": zod.enum(['owner', 'admin', 'sanitaeter_leitung_admin', 'sanitaeter_leitung', 'teacher', 'sanitaeter']),
   "customRoleId": zod.string().nullish(),
   "customRole": zod.object({
   "id": zod.string(),
