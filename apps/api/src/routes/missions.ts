@@ -130,7 +130,11 @@ const updateSchema = z.object({
   treatmentNotes: z.string().optional(),
 });
 
-router.patch("/missions/:id", requireAuth, async (req, res) => {
+router.patch(
+  "/missions/:id",
+  requireAuth,
+  requireRole("owner", "admin", "sanitaeter_leitung_admin", "sanitaeter_leitung", "teacher"),
+  async (req, res) => {
   const parsed = updateSchema.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: "Invalid request" });
@@ -171,6 +175,10 @@ router.post(
 );
 
 router.post("/missions/:id/respond", requireAuth, async (req, res) => {
+  if (req.user!.role === "sanitaeter" && !(await checkSanitaeterDuty(req.user!.id))) {
+    res.status(403).json({ error: "no_duty_today" });
+    return;
+  }
   const missionId = req.params["id"] as string;
   const existing = await db
     .select()

@@ -66,7 +66,13 @@ export async function requireAuth(
       eq(usersTable.customRoleId, customRolesTable.id),
     )
     .where(eq(usersTable.id, payload.sub))
-    .limit(1);
+    .limit(1)
+    .catch(() => null);
+
+  if (!result) {
+    res.status(503).json({ error: "Service unavailable" });
+    return;
+  }
 
   if (!result[0]) {
     res.status(401).json({ error: "User not found" });

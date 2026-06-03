@@ -30,7 +30,11 @@ app.use(
   }),
 );
 
-app.use(cors({ origin: process.env.ALLOWED_ORIGIN ?? '*' }));
+const allowedOrigin = process.env["ALLOWED_ORIGIN"];
+if (!allowedOrigin && process.env["NODE_ENV"] === "production") {
+  throw new Error("ALLOWED_ORIGIN must be set in production");
+}
+app.use(cors({ origin: allowedOrigin ?? "*" }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

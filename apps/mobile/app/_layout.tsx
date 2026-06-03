@@ -20,7 +20,19 @@ import { ThemeProvider } from "@/context/ThemeContext";
 
 SplashScreen.preventAutoHideAsync();
 
-setBaseUrl(`http://${process.env.EXPO_PUBLIC_DOMAIN}`);
+function resolveApiBaseUrl(): string {
+  const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "localhost:3000";
+  const host = domain.split(":")[0] ?? "";
+  const isLocal =
+    host === "localhost" ||
+    host === "127.0.0.1" ||
+    /^10\./.test(host) ||
+    /^192\.168\./.test(host) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(host);
+  return `${isLocal ? "http" : "https"}://${domain}`;
+}
+
+setBaseUrl(resolveApiBaseUrl());
 
 const queryClient = new QueryClient({
   defaultOptions: {

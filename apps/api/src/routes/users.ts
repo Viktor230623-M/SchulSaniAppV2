@@ -42,18 +42,26 @@ const updateSchema = z.object({
   customRoleId: z.string().uuid().nullable().optional(),
 });
 
+const uuidSchema = z.string().uuid();
+
 router.patch(
   "/users/:id",
   requireAuth,
   requireRole("owner", "admin", "sanitaeter_leitung_admin"),
   async (req, res) => {
+    const idParsed = uuidSchema.safeParse(req.params["id"]);
+    if (!idParsed.success) {
+      res.status(400).json({ error: "Invalid user id" });
+      return;
+    }
+
     const parsed = updateSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid request" });
       return;
     }
 
-    const targetId = req.params["id"] as string;
+    const targetId = idParsed.data;
     const [target] = await db
       .select()
       .from(usersTable)

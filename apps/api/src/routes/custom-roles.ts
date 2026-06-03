@@ -7,6 +7,27 @@ import { requireAuth, requireRole } from "../lib/auth";
 
 const router = Router();
 
+const uuidSchema = z.string().uuid();
+
+const VALID_PERMISSIONS = z.enum([
+  "missions.view",
+  "missions.create",
+  "missions.close",
+  "missions.respond",
+  "duty.view",
+  "duty.manage",
+  "loa.view",
+  "loa.submit",
+  "loa.manage",
+  "news.view",
+  "news.post",
+  "news.manage",
+  "users.view",
+  "users.manage",
+  "roles.assign",
+  "roles.create",
+]);
+
 router.get(
   "/custom-roles",
   requireAuth,
@@ -27,9 +48,9 @@ router.get(
 );
 
 const createSchema = z.object({
-  name: z.string().min(1),
-  color: z.string().optional(),
-  permissions: z.array(z.string()),
+  name: z.string().min(1).max(64),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  permissions: z.array(VALID_PERMISSIONS),
 });
 
 router.post(
@@ -64,9 +85,9 @@ router.post(
 );
 
 const updateSchema = z.object({
-  name: z.string().min(1).optional(),
-  color: z.string().optional(),
-  permissions: z.array(z.string()).optional(),
+  name: z.string().min(1).max(64).optional(),
+  color: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+  permissions: z.array(VALID_PERMISSIONS).optional(),
 });
 
 router.patch(
@@ -74,33 +95,42 @@ router.patch(
   requireAuth,
   requireRole("owner"),
   async (req, res) => {
+    const idParsed = uuidSchema.safeParse(req.params["id"]);
+    if (!idParsed.success) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+
     const parsed = updateSchema.safeParse(req.body);
     if (!parsed.success) {
       res.status(400).json({ error: "Invalid request" });
       return;
     }
-    await db
-      .update(customRolesTable)
-      .set(parsed.data)
-      .where(eq(customRolesTable.id, req.params["id"] as string));
 
-    const [updated] = await db
+    const [existing] = await db
       .select()
       .from(customRolesTable)
-      .where(eq(customRolesTable.id, req.params["id"] as string))
+      .where(eq(customRolesTable.id, idParsed.data))
       .limit(1);
 
-    if (!updated) {
+    if (!existing) {
       res.status(404).json({ error: "Not found" });
       return;
     }
+
+    const [updated] = await db
+      .update(customRolesTable)
+      .set(parsed.data)
+      .where(eq(customRolesTable.id, idParsed.data))
+      .returning();
+
     res.json({
-      id: updated.id,
-      name: updated.name,
-      color: updated.color,
-      permissions: updated.permissions as string[],
-      createdBy: updated.createdBy,
-      createdAt: updated.createdAt.toISOString(),
+      id: updated!.id,
+      name: updated!.name,
+      color: updated!.color,
+      permissions: updated!.permissions as string[],
+      createdBy: updated!.createdBy,
+      createdAt: updated!.createdAt.toISOString(),
     });
   },
 );
@@ -110,9 +140,26 @@ router.delete(
   requireAuth,
   requireRole("owner"),
   async (req, res) => {
+    const idParsed = uuidSchema.safeParse(req.params["id"]);
+    if (!idParsed.success) {
+      res.status(400).json({ error: "Invalid id" });
+      return;
+    }
+
+    const [existing] = await db
+      .select({ id: customRolesTable.id })
+      .from(customRolesTable)
+      .where(eq(customRolesTable.id, idParsed.data))
+      .limit(1);
+
+    if (!existing) {
+      res.status(404).json({ error: "Not found" });
+      return;
+    }
+
     await db
       .delete(customRolesTable)
-      .where(eq(customRolesTable.id, req.params["id"] as string));
+      .where(eq(customRolesTable.id, idParsed.data));
     res.json({ message: "Gelöscht" });
   },
 );
